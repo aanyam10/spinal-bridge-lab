@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+:root{color-scheme:light;--ink:#253334;--muted:#637475;--line:#dde5df;--teal:#147d70;--cream:#fafaf5}
+*{box-sizing:border-box}body{margin:0;font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink);background:var(--cream)}
+button,select,input{font:inherit}button,select{cursor:pointer;border:1px solid #d4dfd8;background:white;color:var(--ink);border-radius:9px;padding:9px 13px}button:hover{background:#eaf3ed}button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #92a4ed;outline-offset:3px}button.primary{background:var(--teal);color:white;border-color:var(--teal);min-width:106px}button.primary:hover{background:#0e6359}.bar{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin:16px 0}.time{margin-left:auto;font-variant-numeric:tabular-nums;font-weight:650}.timeline{width:100%;accent-color:var(--teal);cursor:pointer;margin:7px 0 0}.ticks{display:flex;justify-content:space-between;font-size:11px;color:var(--muted)}
+.stage{background:#112c30;border-radius:18px;padding:6px 8px 12px;overflow:hidden;box-shadow:0 8px 24px #12332a0b}.stage canvas{width:100%;height:430px;display:block}.legend{display:flex;justify-content:center;gap:18px;flex-wrap:wrap;color:#c6d9d7;font-size:11px;padding:0 8px}.dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px}.subtle{color:var(--muted);font-size:12px}.metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:18px}.metric{border:1px solid var(--line);border-radius:13px;padding:14px 16px;background:white}.label{font-size:12px;color:var(--muted)}.value{font-size:29px;font-weight:650;letter-spacing:-1px;margin:2px 0}.detail{font-size:11px;color:var(--muted)}.chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:18px}.chart-card{border:1px solid var(--line);border-radius:13px;background:#fff;padding:14px 16px}.chart-title{font-weight:600;font-size:13px}.chart-card canvas{display:block;width:100%;height:136px}.chart-legend{font-size:10px;display:flex;gap:14px;color:var(--muted);margin:4px 0 0 24px}.note{border-left:3px solid #97b8a1;margin:16px 0 0;padding:4px 12px;font-size:12px;color:var(--muted)}.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+@media(max-width:620px){.stage canvas{height:390px}.legend{gap:9px}.metrics{gap:7px}.metric{padding:11px 9px}.value{font-size:24px}.label{font-size:10px}.chart-grid{gap:8px}.chart-card{padding:10px 8px}.chart-title{font-size:11px}.time{font-size:12px}.bar{gap:6px}button,select{padding:8px}.detail{font-size:10px}}
+</style>
+</head>
+<body>
+<div class="stage">
+  <canvas id="scene" role="img" aria-label="Two schematic injury gaps comparing axon paths without a scaffold and with your selected scaffold design."></canvas>
+  <div class="legend"><span><i class="dot" style="background:#b4a0ed"></i>Growing</span><span><i class="dot" style="background:#70e2b1"></i>Target matched</span><span><i class="dot" style="background:#eabb78"></i>Misdirected</span><span><i class="dot" style="background:#829495"></i>Stopped</span><span><i class="dot" style="background:#d49c99"></i>Scar barrier</span></div>
+</div>
+<div class="bar">
+  <button id="play" class="primary" aria-label="Play or pause simulation">▶ Play</button>
+  <button id="restart" aria-label="Restart timeline">↺ Restart</button>
+  <button id="end" aria-label="Jump to final model day">Final day</button>
+  <label class="sr" for="speed">Playback speed</label><select id="speed" aria-label="Playback speed"><option value="4">0.5× speed</option><option value="8" selected>1× speed</option><option value="16">2× speed</option></select>
+  <span class="time" id="time">Model day 0 / 84</span>
+</div>
+<label class="sr" for="timeline">Model day</label><input id="timeline" class="timeline" type="range" min="0" max="84" value="0" step="1" aria-label="Model day">
+<div class="ticks"><span>Injury gap</span><span>Explore the timeline →</span><span id="lastTick">84 model days</span></div>
+<div class="metrics" aria-live="polite" aria-atomic="true">
+  <div class="metric"><div class="label">AXONS ACROSS THE GAP</div><div class="value" id="crossed">0 / 60</div><div class="detail" id="baselineCrossed">Without scaffold: 0</div></div>
+  <div class="metric"><div class="label">CORRECT TARGET MATCHES</div><div class="value" id="matched">0 / 60</div><div class="detail" id="baselineMatched">Without scaffold: 0</div></div>
+  <div class="metric"><div class="label">SCAFFOLD REMAINING</div><div class="value" id="mass">100%</div><div class="detail">A temporary bridge that fades</div></div>
+</div>
+<div class="chart-grid">
+  <div class="chart-card"><div class="chart-title">Crossing is only the beginning.</div><canvas id="outcomes" role="img" aria-label="Timeline of axons crossing the gap and axons matching their assigned targets for the selected design."></canvas><div class="chart-legend"><span>― Across gap</span><span style="color:#147d70">― Target matched</span></div></div>
+  <div class="chart-card"><div class="chart-title">The scaffold's support is temporary.</div><canvas id="support" role="img" aria-label="Scaffold remaining and local growth-factor signal versus model day."></canvas><div class="chart-legend"><span style="color:#147d70">― Scaffold</span><span style="color:#8870b8">― Growth signal</span></div></div>
+</div>
+<div class="note">These are model counts, not recovery rates. A “target match” is a geometric match in this simulation; it does not establish a working synapse or restored function. Time is illustrative.</div>
+<script>
+'use strict';
+const DATA=__SIMULATION_DATA__;
+const runs=[DATA.baseline,DATA.design], total=DATA.design.settings.days, n=DATA.design.settings.axons;
+let day=0,playing=false,last=0,lastDraw=0,lastAnnounced=-1;
+const $=id=>document.getElementById(id), timeline=$('timeline'), scene=$('scene');
+timeline.max=total;$('lastTick').textContent=total+' model days';
+const colors={growing:'#b4a0ed',connected:'#70e2b1',misdirected:'#eabb78',stopped:'#829495'};
+function setupCanvas(canvas){const r=canvas.getBoundingClientRect(),dpr=Math.min(window.devicePixelRatio||1,2);canvas.width=r.width*dpr;canvas.height=r.height*dpr;const ctx=canvas.getContext('2d');ctx.scale(dpr,dpr);return {ctx,w:r.width,h:r.height};}
+function pill(ctx,x,y,text,color){ctx.fillStyle=color;ctx.font='600 10px -apple-system, sans-serif';ctx.fillText(text,x,y);}
+function panel(ctx,w,h,run,index,t){
+ const top=index*h/2, left=w*.22,right=w*.80, gapWidth=right-left, cy=top+62, bh=h/2-97;
+ const d=Math.min(total,Math.floor(t)), f=t-d, hist=run.history[d], cfg=run.settings;
+ ctx.fillStyle='#e4eeea';ctx.font='600 13px -apple-system, sans-serif';ctx.fillText(index===0?'01  Without a scaffold':'02  '+(cfg.scaffold?'Your bridge design':'Your design · scaffold off'),18,top+28);
+ ctx.fillStyle='#9eb8b8';ctx.font='10px -apple-system, sans-serif';ctx.fillText(index===0?'Same injury. Same starting axons.':'Guidance + temporary biological support',18,top+45);
+ ctx.fillStyle='#1b3c40';ctx.fillRect(18,cy,left-18,bh);ctx.fillRect(right,cy,w-right-18,bh);
+ // Injury cavity and schematic scar at both edges.
+ ctx.fillStyle='#0c252a';ctx.fillRect(left,cy,gapWidth,bh);
+ for(let k=0;k<14;k++){const sy=cy+4+k*(bh-8)/13;ctx.fillStyle='rgba(212,156,153,'+(.15+.65*cfg.scar)+')';ctx.beginPath();ctx.arc(left+3,sy,2+cfg.scar*2,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.arc(right-3,sy,2+cfg.scar*2,0,Math.PI*2);ctx.fill();}
+ if(cfg.scaffold){
+   const m=hist.scaffold_remaining;ctx.fillStyle='rgba(81,182,162,'+(.04+.15*m)+')';ctx.fillRect(left+7,cy+2,gapWidth-14,bh-4);
+   ctx.strokeStyle='rgba(102,217,189,'+(.07+.28*m)+')';ctx.lineWidth=1;ctx.setLineDash([5,5]);
+   for(let k=0;k<9;k++){let y=cy+(k+1)*bh/10;ctx.beginPath();ctx.moveTo(left+7,y);ctx.lineTo(right-7,y);ctx.stroke();}ctx.setLineDash([]);
+   if(cfg.cells>0){ctx.fillStyle='rgba(132,172,239,'+(.2+.55*cfg.cells)+')';for(let k=0;k<10;k++){ctx.beginPath();ctx.arc(left+gapWidth*(.12+.76*((k*7)%10)/10),cy+bh*(.15+.7*((k*3)%10)/10),3,0,Math.PI*2);ctx.fill();}}
+   if(cfg.growth_factors>0){ctx.fillStyle='rgba(194,176,231,'+(.1+.7*hist.growth_signal)+')';for(let k=0;k<22;k++){ctx.beginPath();ctx.arc(left+gapWidth*(.06+.88*((k*13)%23)/23),cy+bh*(.10+.8*((k*7)%23)/23),1.5,0,Math.PI*2);ctx.fill();}}
+ }
+ // Draw the same source and target positions in both panels.
+ run.sources.forEach(s=>{const yy=cy+s*bh;ctx.strokeStyle='#688c89';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(24,yy);ctx.lineTo(left,yy);ctx.stroke();ctx.strokeStyle='#638b82';ctx.beginPath();ctx.arc(right+12,yy,2,0,Math.PI*2);ctx.stroke();ctx.beginPath();ctx.moveTo(right+15,yy);ctx.lineTo(w-24,yy);ctx.stroke();});
+ run.paths.forEach((path,i)=>{
+   const a=run.frames[d][i], next=run.frames[Math.min(total,d+1)][i], x=a.x+(next.x-a.x)*f, y=a.y+(next.y-a.y)*f;
+   ctx.strokeStyle=colors[a.state];ctx.globalAlpha=a.state==='stopped'?.28:.83;ctx.lineWidth=a.state==='connected'?1.8:1.1;
+   ctx.beginPath();ctx.moveTo(left,cy+path[0][1]*bh);for(let j=1;j<=d;j++)ctx.lineTo(left+path[j][0]*gapWidth,cy+path[j][1]*bh);ctx.lineTo(left+x*gapWidth,cy+y*bh);ctx.stroke();
+   ctx.fillStyle=colors[a.state];ctx.beginPath();ctx.arc(left+x*gapWidth,cy+y*bh,a.state==='connected'?2.8:1.6,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;
+ });
+ pill(ctx,left,cy+bh+19,'INJURY GAP  →','#9eb8b8');pill(ctx,right+8,cy+bh+19,'TARGETS','#9eb8b8');
+ if(index===0){ctx.strokeStyle='#2c484b';ctx.beginPath();ctx.moveTo(18,h/2);ctx.lineTo(w-18,h/2);ctx.stroke();}
+}
+function chart(id,series,maxY){
+ const {ctx,w,h}=setupCanvas($(id)),l=26,r=w-7,b=h-24,t=16,plotW=r-l,plotH=b-t;
+ ctx.font='10px -apple-system, sans-serif';ctx.fillStyle='#83918c';ctx.textAlign='right';
+ for(let k=0;k<=2;k++){const v=maxY*k/2,yy=b-k*plotH/2;ctx.fillText(Math.round(v),l-6,yy+3);ctx.strokeStyle='#edf0eb';ctx.beginPath();ctx.moveTo(l,yy);ctx.lineTo(r,yy);ctx.stroke();}
+ ctx.textAlign='center';[0,Math.round(total/2),total].forEach(v=>ctx.fillText(v,l+v/total*plotW,h-6));
+ series.forEach(s=>{ctx.strokeStyle=s.color;ctx.lineWidth=2;ctx.beginPath();s.values.forEach((v,i)=>{const x=l+i/total*plotW,y=b-v/maxY*plotH;i?ctx.lineTo(x,y):ctx.moveTo(x,y);});ctx.stroke();});
+ const xx=l+day/total*plotW;ctx.setLineDash([3,3]);ctx.strokeStyle='#9ba9a4';ctx.beginPath();ctx.moveTo(xx,t);ctx.lineTo(xx,b);ctx.stroke();ctx.setLineDash([]);
+}
+function render(){
+ const {ctx,w,h}=setupCanvas(scene);panel(ctx,w,h,runs[0],0,day);panel(ctx,w,h,runs[1],1,day);
+ const d=Math.round(day),a=runs[0].history[d],b=runs[1].history[d];
+ timeline.value=d;$('time').textContent='Model day '+d+' / '+total;
+ if(d!==lastAnnounced){$('crossed').textContent=b.crossed+' / '+n;$('matched').textContent=b.connected+' / '+n;$('mass').textContent=Math.round(b.scaffold_remaining*100)+'%';$('baselineCrossed').textContent='Without scaffold: '+a.crossed;$('baselineMatched').textContent='Without scaffold: '+a.connected;lastAnnounced=d;}
+ chart('outcomes',[{values:runs[1].history.map(x=>x.crossed),color:'#b5a4d9'},{values:runs[1].history.map(x=>x.connected),color:'#147d70'}],n);
+ chart('support',[{values:runs[1].history.map(x=>x.scaffold_remaining*100),color:'#147d70'},{values:runs[1].history.map(x=>x.growth_signal*100),color:'#8870b8'}],100);
+}
+function setPlay(v){playing=v;$('play').textContent=v?'Ⅱ Pause':'▶ Play';last=0;}
+$('play').onclick=()=>{if(day>=total)day=0;setPlay(!playing);render();};
+$('restart').onclick=()=>{setPlay(false);day=0;render();};
+$('end').onclick=()=>{setPlay(false);day=total;render();};
+timeline.oninput=()=>{setPlay(false);day=Number(timeline.value);render();};
+function tick(ts){if(playing){if(last){day=Math.min(total,day+(ts-last)/1000*Number($('speed').value));}last=ts;if(ts-lastDraw>40){render();lastDraw=ts;}if(day>=total){setPlay(false);render();}}else{last=0;}requestAnimationFrame(tick);}
+new ResizeObserver(()=>render()).observe(document.body);
+render();requestAnimationFrame(tick);
+</script>
+</body>
+</html>
