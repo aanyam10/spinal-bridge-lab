@@ -12,7 +12,7 @@ from model import PRESETS, Settings, paired_runs, sensitivity
 
 ROOT = Path(__file__).resolve().parent
 
-st.set_page_config(page_title='Spinal Bridge Lab · Aanya Mendapara', page_icon='🧠', layout='wide')
+st.set_page_config(page_title='Spinal Bridge Lab · Aanya Mendapara', layout='wide')
 st.markdown('''<style>
 .stApp{background:#fafaf5;color:#253334}
 .block-container{max-width:1200px;padding-top:2rem;padding-bottom:3rem}
